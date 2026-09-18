@@ -1,98 +1,93 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { AnimatedBackground } from "@/components/animated-background";
+import { NfcKeepNearBanner } from "@/components/nfc-keep-near-banner";
+import {
+  getNfcBadgeConfig,
+  NfcStatusBadge,
+} from "@/components/nfc-status-badge";
+import { ScanResultModal } from "@/components/scan-result-modal";
+import { ScanningAnimation } from "@/components/scanning-animation";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { Spacing } from "@/constants/theme";
+import { useNfcStatusContext } from "@/hooks/nfc-status-context";
+import { useNfcScanLoop } from "@/hooks/use-nfc-scan-loop";
+import { activateBracelet } from "@/services/nfc-bracelet";
+import { useCallback, useMemo } from "react";
+import { View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
+export default function ActivateScreen() {
+  const { supported, enabled, canScan } = useNfcStatusContext();
+  const scan = useCallback(() => activateBracelet(), []);
+  const getSuccessMessage = useCallback(
+    () => "Pulsera activada correctamente.",
+    [],
   );
-}
 
-export default function HomeScreen() {
+  const { scanning, modal, resultDurationMs, showKeepNearHint } = useNfcScanLoop({
+    scan,
+    getSuccessMessage,
+  });
+
+  const badge = useMemo(
+    () => getNfcBadgeConfig(supported, enabled, canScan, scanning),
+    [supported, enabled, canScan, scanning],
+  );
+
+  const isScanningActive = canScan && scanning;
+
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+    <ThemedView style={{ flex: 1 }}>
+      <AnimatedBackground active={isScanningActive} />
+      <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
+        <View
+          style={{
+            flex: 1,
+            paddingHorizontal: Spacing.four,
+          }}
+        >
+          <View className="pt-6 gap-4">
+            <NfcStatusBadge badge={badge} className="mt-8" />
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+            <View className="gap-2">
+              <ThemedText
+                type="subtitle"
+                className="text-[32px] text-center leading-[38px] tracking-tight"
+              >
+                Activar pulsera
+              </ThemedText>
+            </View>
+          </View>
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+          {showKeepNearHint && (
+            <View className="mt-4">
+              <NfcKeepNearBanner
+                message="Mantén la pulsera cerca del móvil hasta que termine la lectura."
+                accentColor="#208AEF"
+              />
+            </View>
+          )}
 
-        {Platform.OS === 'web' && <WebBadge />}
+          <View
+            style={{
+              flex: 1,
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <ScanningAnimation active={isScanningActive} variant="hero" />
+          </View>
+        </View>
       </SafeAreaView>
+
+      {modal && (
+        <ScanResultModal
+          visible
+          type={modal.type}
+          message={modal.message}
+          durationMs={resultDurationMs}
+        />
+      )}
     </ThemedView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
-  },
-});
